@@ -133,9 +133,15 @@ const MCPChat: React.FC<MCPChatProps> = ({ isOpen, onClose }) => {
     const toolNames: Record<string, string> = {
       drawSquare: "Square",
       drawCircle: "Circle",
-      drawRectangle: "Rectangle",
-      drawText: "Text",
-      editSquare: "Edit Square",
+      drawLine: "Line",
+      addText: "Text",
+      addImage: "Image",
+      addFrame: "Frame",
+      move: "Move",
+      moveTo: "Move To",
+      deleteElement: "Delete",
+      editStroke: "Edit Stroke",
+      addArrow: "Arrow",
     };
     return toolNames[toolName] || toolName;
   };

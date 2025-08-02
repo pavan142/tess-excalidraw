@@ -13,109 +13,6 @@ let conversationHistory: Array<{
     | undefined;
 }> = [];
 
-// Updated tool schema to support multiple tools
-const toolSchema = z.object({
-  tools: z.array(
-    z.object({
-      tool: z.enum([
-        "drawSquare",
-        "drawCircle",
-        "editSquare",
-        "drawRectangle",
-        "drawText",
-      ]),
-      payload: z.object({
-        x: z.number().optional(),
-        y: z.number().optional(),
-        size: z.number().optional(),
-        width: z.number().optional(),
-        height: z.number().optional(),
-        text: z.string().optional(),
-        strokeColor: z.string().optional(),
-        backgroundColor: z.string().optional(),
-        fillStyle: z
-          .enum(["hachure", "solid", "cross-hatch", "zigzag"])
-          .optional(),
-        strokeWidth: z.number().optional(),
-        strokeStyle: z.enum(["solid", "dashed", "dotted"]).optional(),
-        roughness: z.number().optional(),
-        opacity: z.number().optional().nullable(),
-        roundness: z.number().optional().nullable(),
-      }),
-    }),
-  ),
-  message: z.string(),
-});
-
-// Updated instruction prompt
-const instructionPrompt = `You are an AI assistant that can directly interact with an Excalidraw whiteboard application. You have access to drawing tools that allow you to create and modify elements on the canvas.
-
-## Available Tools:
-
-### 1. drawSquare
-Creates a square on the canvas.
-- **Parameters:**
-  - x (number): X coordinate for top-left corner (default: 100)
-  - y (number): Y coordinate for top-left corner (default: 100)
-  - size (number): Width and height of the square (default: 100)
-  - strokeColor (string): Border color (default: "#1e1e1e")
-  - backgroundColor (string): Fill color (default: "skyblue")
-  - fillStyle (string): Fill pattern - "hachure", "solid", "cross-hatch", "zigzag" (default: "hachure")
-  - strokeWidth (number): Border thickness (default: 4)
-  - strokeStyle (string): Border style - "solid", "dashed", "dotted" (default: "solid")
-  - roughness (number): Hand-drawn effect (default: 1)
-  - opacity (number): Transparency 0-100 (default: 90)
-  - roundness (number): Corner radius (default: null)
-
-### 2. drawCircle
-Creates a circle on the canvas.
-- **Parameters:** Same as drawSquare, but creates a circular shape
-
-### 3. drawRectangle
-Creates a rectangle on the canvas.
-- **Parameters:**
-  - x, y: Position coordinates
-  - width, height: Dimensions (can be different for rectangles)
-  - All styling parameters same as drawSquare
-
-### 4. drawText
-Adds text to the canvas.
-- **Parameters:**
-  - x, y: Position coordinates
-  - text (string): The text content to display
-  - fontSize (number): Text size (default: 20)
-  - fontFamily (string): Font type (default: "Virgil")
-  - textAlign (string): "left", "center", "right" (default: "left")
-  - strokeColor: Text color
-
-### 5. editSquare
-Modifies an existing square element.
-- **Parameters:** Same as drawSquare, plus elementId to identify which element to edit
-
-## Usage Guidelines:
-
-1. **Be Creative**: Use the tools to create interesting diagrams, flowcharts, or visual representations
-2. **Coordinate System**: The canvas uses a coordinate system where (0,0) is at the top-left
-3. **Color Options**: Use descriptive colors like "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown", "gray", "black", "white"
-4. **Positioning**: Think about where elements should be placed relative to each other
-5. **Sizing**: Consider appropriate sizes for different elements (small for details, large for main elements)
-6. **Styling**: Use different stroke widths, colors, and fill styles to create visual hierarchy
-7. **Multiple Tools**: You can use multiple tools in a single response to create complex diagrams
-
-## Response Format:
-When a user asks you to draw something, respond with:
-1. A brief description of what you're going to create
-2. Use the appropriate tool(s) with specific parameters (you can use multiple tools)
-3. Provide a friendly message explaining what was created
-
-## Examples:
-- "Draw a red square in the center" → Use drawSquare with x: 200, y: 200, size: 100, strokeColor: "red"
-- "Create a flowchart with boxes and arrows" → Use multiple drawRectangle calls with connecting lines
-- "Add some text labels" → Use drawText to add descriptive labels
-- "Create a simple house" → Use drawRectangle for walls, drawSquare for windows, drawText for labels
-
-Remember to be helpful, creative, and precise with your tool usage!`;
-
 // Function to add message to conversation history
 function addToHistory(
   role: "user" | "assistant",
@@ -246,37 +143,118 @@ async function executeTool(toolName: string, payload: any) {
         }
         break;
 
-      case "drawRectangle":
+      case "drawLine":
         // @ts-ignore
-        if (window["drawRectangle"]) {
+        if (window["drawLine"]) {
           // @ts-ignore
-          window["drawRectangle"](
-            payload.x,
-            payload.y,
-            payload.width,
-            payload.height,
-            {
-              strokeColor: payload.strokeColor,
-              backgroundColor: payload.backgroundColor,
-              fillStyle: payload.fillStyle,
-              strokeWidth: payload.strokeWidth,
-              strokeStyle: payload.strokeStyle,
-              roughness: payload.roughness,
-              opacity: payload.opacity,
-              roundness: payload.roundness,
-            },
-          );
+          window["drawLine"](payload.x, payload.y, payload.width, payload.height, {
+            strokeColor: payload.strokeColor,
+            strokeWidth: payload.strokeWidth,
+            strokeStyle: payload.strokeStyle,
+            roughness: payload.roughness,
+            opacity: payload.opacity,
+          });
         }
         break;
 
-      case "drawText":
-        // TODO: Implement drawText function
-        console.log("drawText not yet implemented");
+      case "addText":
+        // @ts-ignore
+        if (window["addText"]) {
+          // @ts-ignore
+          window["addText"](payload.x, payload.y, payload.text, {
+            fontSize: payload.fontSize,
+            fontFamily: payload.fontFamily,
+            textAlign: payload.textAlign,
+            verticalAlign: payload.verticalAlign,
+            strokeColor: payload.strokeColor,
+            backgroundColor: payload.backgroundColor,
+            fillStyle: payload.fillStyle,
+            strokeWidth: payload.strokeWidth,
+            strokeStyle: payload.strokeStyle,
+            roughness: payload.roughness,
+            opacity: payload.opacity,
+            angle: payload.angle,
+          });
+        }
         break;
 
-      case "editSquare":
-        // TODO: Implement editSquare function
-        console.log("editSquare not yet implemented");
+      case "addImage":
+        // @ts-ignore
+        if (window["addImage"]) {
+          // @ts-ignore
+          window["addImage"](payload.x, payload.y, payload.imageUrl, {
+            width: payload.width,
+            height: payload.height,
+            scale: payload.scale,
+            opacity: payload.opacity,
+            angle: payload.angle,
+          });
+        }
+        break;
+
+      case "addFrame":
+        // @ts-ignore
+        if (window["addFrame"]) {
+          // @ts-ignore
+          window["addFrame"](payload.x, payload.y, payload.width, payload.height, payload.name, {
+            strokeColor: payload.strokeColor,
+            backgroundColor: payload.backgroundColor,
+            fillStyle: payload.fillStyle,
+            strokeWidth: payload.strokeWidth,
+            strokeStyle: payload.strokeStyle,
+            roughness: payload.roughness,
+            opacity: payload.opacity,
+            angle: payload.angle,
+          });
+        }
+        break;
+
+      case "move":
+        // @ts-ignore
+        if (window["move"]) {
+          // @ts-ignore
+          window["move"](payload.elementId, payload.x, payload.y);
+        }
+        break;
+
+      case "moveTo":
+        // @ts-ignore
+        if (window["moveTo"]) {
+          // @ts-ignore
+          window["moveTo"](payload.elementId, payload.x, payload.y);
+        }
+        break;
+
+      case "deleteElement":
+        // @ts-ignore
+        if (window["deleteElement"]) {
+          // @ts-ignore
+          window["deleteElement"](payload.elementId);
+        }
+        break;
+
+      case "editStroke":
+        // @ts-ignore
+        if (window["editStroke"]) {
+          // @ts-ignore
+          window["editStroke"](payload.elementId, payload.strokeColor, payload.strokeWidth, payload.strokeStyle);
+        }
+        break;
+
+      case "addArrow":
+        // @ts-ignore
+        if (window["addArrow"]) {
+          // @ts-ignore
+          window["addArrow"](payload.fromElementId, payload.toElementId, {
+            strokeColor: payload.strokeColor,
+            strokeWidth: payload.strokeWidth,
+            strokeStyle: payload.strokeStyle,
+            startArrowhead: payload.startArrowhead,
+            endArrowhead: payload.endArrowhead,
+            roughness: payload.roughness,
+            opacity: payload.opacity,
+          });
+        }
         break;
 
       default:
