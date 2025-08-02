@@ -101,6 +101,7 @@ import {
   exportToExcalidrawPlus,
 } from "./components/ExportToExcalidrawPlus";
 import { TopErrorBoundary } from "./components/TopErrorBoundary";
+import { drawSquare } from "./mcp/MCPTools";
 
 import {
   exportToBackend,
@@ -138,6 +139,11 @@ import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
 import "./index.scss";
 
 import type { CollabAPI } from "./collab/Collab";
+
+// @chad here is where you can your test code
+setTimeout(() => {
+  drawSquare();
+}, 2000);
 
 polyfill();
 
