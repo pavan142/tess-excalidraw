@@ -135,12 +135,14 @@ import DebugCanvas, {
 } from "./components/DebugCanvas";
 import { AIComponents } from "./components/AI";
 import { ExcalidrawPlusIframeExport } from "./ExcalidrawPlusIframeExport";
+import MCPChat from "./components/MCPChat";
 
 import "./index.scss";
 
 import type { CollabAPI } from "./collab/Collab";
+import MCPChatButton from "./components/MCPChatButton";
 
-// @chad here is where you can your test code
+// // @chad here is where you can your test code
 setTimeout(() => {
   drawSquare();
 }, 2000);
@@ -1148,6 +1150,9 @@ const ExcalidrawWrapper = () => {
             ref={debugCanvasRef}
           />
         )}
+
+        {/* MCP Chat Button */}
+        <MCPChatButton />
       </Excalidraw>
     </div>
   );
