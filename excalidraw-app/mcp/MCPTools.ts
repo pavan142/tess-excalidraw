@@ -1,4 +1,11 @@
-import { newElement, newLinearElement, newTextElement, newImageElement, newFrameElement, newArrowElement } from "@excalidraw/element";
+import {
+  newElement,
+  newLinearElement,
+  newTextElement,
+  newImageElement,
+  newFrameElement,
+  newArrowElement,
+} from "@excalidraw/element";
 import { pointFrom } from "@excalidraw/math";
 
 // @chad here is where you can define new MCP tools
@@ -318,17 +325,17 @@ export function addImage(
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
     ctx?.drawImage(img, 0, 0);
-    
+
     canvas.toBlob((blob) => {
       if (blob) {
         // Convert blob to base64 data URL
         const reader = new FileReader();
         reader.onload = () => {
           const dataURL = reader.result as string;
-          
+
           // Create a file object for Excalidraw
           const file = new File([blob], "image.jpg", { type: "image/jpeg" });
-          
+
           // Update the image element with the loaded data
           h.scene.mutateElement(imageElement, {
             status: "saved",
@@ -358,7 +365,7 @@ export function addImage(
       }
     }, "image/jpeg");
   };
-  
+
   img.onerror = () => {
     console.error("Failed to load image:", imageUrl);
     // Update element status to error
@@ -366,7 +373,7 @@ export function addImage(
       status: "error",
     });
   };
-  
+
   img.src = imageUrl;
 
   // Trigger a re-render by updating the scene
@@ -455,11 +462,7 @@ export function addFrame(
  * @param newY - New Y coordinate for the element
  * @returns The updated element or null if not found
  */
-export function move(
-  elementId: string,
-  newX: number,
-  newY: number,
-) {
+export function move(elementId: string, newX: number, newY: number) {
   console.log("move", elementId, newX, newY);
   // Access the Excalidraw app instance through the global window.h object
   const { h } = window;
@@ -473,10 +476,10 @@ export function move(
 
   // Get all elements from the scene
   const elements = h.scene.getElementsIncludingDeleted();
-  
+
   // Find the element by ID
-  const element = elements.find(el => el.id === elementId);
-  
+  const element = elements.find((el) => el.id === elementId);
+
   if (!element) {
     console.error(`Element with ID "${elementId}" not found.`);
     return null;
@@ -507,11 +510,7 @@ export function move(
  * @param targetY - Target Y coordinate for the element
  * @returns The updated element or null if not found
  */
-export function moveTo(
-  elementId: string,
-  targetX: number,
-  targetY: number,
-) {
+export function moveTo(elementId: string, targetX: number, targetY: number) {
   console.log("moveTo", elementId, targetX, targetY);
   // Access the Excalidraw app instance through the global window.h object
   const { h } = window;
@@ -525,10 +524,10 @@ export function moveTo(
 
   // Get all elements from the scene
   const elements = h.scene.getElementsIncludingDeleted();
-  
+
   // Find the element by ID
-  const element = elements.find(el => el.id === elementId);
-  
+  const element = elements.find((el) => el.id === elementId);
+
   if (!element) {
     console.error(`Element with ID "${elementId}" not found.`);
     return null;
@@ -548,8 +547,12 @@ export function moveTo(
     });
   }
 
-  console.log(`Moved element ${elementId} to position (${targetX}, ${targetY})`);
-  return element;
+  console.log(
+    `Moved element ${elementId} to position (${targetX}, ${targetY})`,
+  );
+  return {
+    id: elementId,
+  };
 }
 
 /**
@@ -557,9 +560,7 @@ export function moveTo(
  * @param elementId - The ID of the element to delete
  * @returns The deleted element or null if not found
  */
-export function deleteElement(
-  elementId: string,
-) {
+export function deleteElement(elementId: string) {
   console.log("deleteElement", elementId);
   // Access the Excalidraw app instance through the global window.h object
   const { h } = window;
@@ -573,10 +574,10 @@ export function deleteElement(
 
   // Get all elements from the scene
   const elements = h.scene.getElementsIncludingDeleted();
-  
+
   // Find the element by ID
-  const element = elements.find(el => el.id === elementId);
-  
+  const element = elements.find((el) => el.id === elementId);
+
   if (!element) {
     console.error(`Element with ID "${elementId}" not found.`);
     return null;
@@ -613,7 +614,11 @@ export function editStroke(
   strokeWidth?: number,
   strokeStyle?: "solid" | "dashed" | "dotted",
 ) {
-  console.log("editStroke", elementId, { strokeColor, strokeWidth, strokeStyle });
+  console.log("editStroke", elementId, {
+    strokeColor,
+    strokeWidth,
+    strokeStyle,
+  });
   // Access the Excalidraw app instance through the global window.h object
   const { h } = window;
 
@@ -626,10 +631,10 @@ export function editStroke(
 
   // Get all elements from the scene
   const elements = h.scene.getElementsIncludingDeleted();
-  
+
   // Find the element by ID
-  const element = elements.find(el => el.id === elementId);
-  
+  const element = elements.find((el) => el.id === elementId);
+
   if (!element) {
     console.error(`Element with ID "${elementId}" not found.`);
     return null;
@@ -642,10 +647,10 @@ export function editStroke(
   if (strokeStyle !== undefined) updates.strokeStyle = strokeStyle;
 
   console.log("Updating element with:", updates);
-  console.log("Element before update:", { 
-    strokeColor: element.strokeColor, 
-    strokeWidth: element.strokeWidth, 
-    strokeStyle: element.strokeStyle 
+  console.log("Element before update:", {
+    strokeColor: element.strokeColor,
+    strokeWidth: element.strokeWidth,
+    strokeStyle: element.strokeStyle,
   });
 
   // Try updating the element's stroke properties
@@ -654,19 +659,25 @@ export function editStroke(
   // Force a scene update to ensure the changes are rendered
   h.scene.triggerUpdate();
 
-  console.log("Element after update:", { 
-    strokeColor: element.strokeColor, 
-    strokeWidth: element.strokeWidth, 
-    strokeStyle: element.strokeStyle 
+  console.log("Element after update:", {
+    strokeColor: element.strokeColor,
+    strokeWidth: element.strokeWidth,
+    strokeStyle: element.strokeStyle,
   });
 
   // If the above doesn't work, try replacing the element entirely
   setTimeout(() => {
     // Check if the stroke color is still not visible
     const updatedElement = h.scene.getElement(elementId);
-    if (updatedElement && updatedElement.strokeColor === strokeColor && strokeColor !== undefined) {
-      console.log("Stroke color updated but not visible, trying alternative approach...");
-      
+    if (
+      updatedElement &&
+      updatedElement.strokeColor === strokeColor &&
+      strokeColor !== undefined
+    ) {
+      console.log(
+        "Stroke color updated but not visible, trying alternative approach...",
+      );
+
       // Create a new element with the same properties but updated stroke
       const newElement = {
         ...updatedElement,
@@ -680,11 +691,11 @@ export function editStroke(
 
       // Replace the element in the scene
       const allElements = h.scene.getElementsIncludingDeleted();
-      const filteredElements = allElements.filter(el => el.id !== elementId);
+      const filteredElements = allElements.filter((el) => el.id !== elementId);
       const newElements = [...filteredElements, newElement as any];
-      
+
       h.scene.replaceAllElements(newElements);
-      
+
       if (h.app && h.app.updateScene) {
         h.app.updateScene({
           elements: h.scene.getElementsIncludingDeleted(),
@@ -731,16 +742,16 @@ export function addArrow(
 
   // Get all elements from the scene
   const elements = h.scene.getElementsIncludingDeleted();
-  
+
   // Find the source and target elements
-  const fromElement = elements.find(el => el.id === fromElementId);
-  const toElement = elements.find(el => el.id === toElementId);
-  
+  const fromElement = elements.find((el) => el.id === fromElementId);
+  const toElement = elements.find((el) => el.id === toElementId);
+
   if (!fromElement) {
     console.error(`Source element with ID "${fromElementId}" not found.`);
     return null;
   }
-  
+
   if (!toElement) {
     console.error(`Target element with ID "${toElementId}" not found.`);
     return null;
@@ -760,11 +771,11 @@ export function addArrow(
   // Calculate edge points (where arrow should start and end)
   const fromRadius = Math.min(fromElement.width, fromElement.height) / 2;
   const toRadius = Math.min(toElement.width, toElement.height) / 2;
-  
+
   // Normalize the direction vector
   const normalizedDeltaX = deltaX / distance;
   const normalizedDeltaY = deltaY / distance;
-  
+
   // Calculate edge points
   const fromEdgeX = fromCenterX + normalizedDeltaX * fromRadius;
   const fromEdgeY = fromCenterY + normalizedDeltaY * fromRadius;
@@ -796,7 +807,7 @@ export function addArrow(
   // Excalidraw uses a 0-1 range where 0 is right, 0.25 is down, 0.5 is left, 0.75 is up
   let fromFocus = 0;
   let toFocus = 0;
-  
+
   if (Math.abs(deltaX) > Math.abs(deltaY)) {
     // Horizontal connection
     if (deltaX > 0) {
@@ -837,14 +848,18 @@ export function addArrow(
   });
 
   // Update the source element to include the arrow in its bound elements
-  const fromBoundElements = fromElement.boundElements ? [...fromElement.boundElements] : [];
+  const fromBoundElements = fromElement.boundElements
+    ? [...fromElement.boundElements]
+    : [];
   fromBoundElements.push({
     id: arrowElement.id,
     type: "arrow",
   });
 
   // Update the target element to include the arrow in its bound elements
-  const toBoundElements = toElement.boundElements ? [...toElement.boundElements] : [];
+  const toBoundElements = toElement.boundElements
+    ? [...toElement.boundElements]
+    : [];
   toBoundElements.push({
     id: arrowElement.id,
     type: "arrow",

@@ -72,8 +72,14 @@ const toolSchema = z.object({
         verticalAlign: z.enum(["top", "middle", "bottom"]).optional(),
         scale: z.array(z.number()).optional(),
         angle: z.number().optional(),
-        startArrowhead: z.enum(["arrow", "bar", "dot", "triangle"]).optional().nullable(),
-        endArrowhead: z.enum(["arrow", "bar", "dot", "triangle"]).optional().nullable(),
+        startArrowhead: z
+          .enum(["arrow", "bar", "dot", "triangle"])
+          .optional()
+          .nullable(),
+        endArrowhead: z
+          .enum(["arrow", "bar", "dot", "triangle"])
+          .optional()
+          .nullable(),
       }),
     }),
   ),
@@ -82,6 +88,18 @@ const toolSchema = z.object({
 
 // Updated comprehensive instruction prompt for Claude
 const instructionPrompt = `You are an AI assistant that can directly interact with an Excalidraw whiteboard application. You have access to drawing tools that allow you to create and modify elements on the canvas.
+
+## Important: Element ID Tracking System
+
+When you create elements using the drawing tools, each element gets a unique ID that is automatically tracked in the conversation history. You can use these IDs to:
+
+1. **Reference existing elements**: When a user asks to modify something you created, you can use the element ID from the conversation history
+2. **Move elements**: Use the move/moveTo tools with the element ID
+3. **Edit properties**: Use editStroke with the element ID to change colors, stroke width, etc.
+4. **Delete elements**: Use deleteElement with the element ID
+5. **Create connections**: Use addArrow with element IDs to connect existing elements
+
+The system automatically tracks element IDs in the background, so you can reference "the square I just created" or "the text element" when users ask for modifications.
 
 ## Available Tools:
 
@@ -174,26 +192,26 @@ Creates a frame/container on the canvas.
 ### 7. move
 Moves an element to new coordinates by its ID.
 - **Parameters:**
-  - elementId (string): The ID of the element to move
+  - elementId (string): The ID of the element to move (use IDs from conversation history)
   - x (number): New X coordinate
   - y (number): New Y coordinate
 
 ### 8. moveTo
 Moves an element to a specific position by its ID.
 - **Parameters:**
-  - elementId (string): The ID of the element to move
+  - elementId (string): The ID of the element to move (use IDs from conversation history)
   - x (number): Target X coordinate
   - y (number): Target Y coordinate
 
 ### 9. deleteElement
 Deletes an element from the canvas by its ID.
 - **Parameters:**
-  - elementId (string): The ID of the element to delete
+  - elementId (string): The ID of the element to delete (use IDs from conversation history)
 
 ### 10. editStroke
 Edits the stroke properties of an element by its ID.
 - **Parameters:**
-  - elementId (string): The ID of the element to edit
+  - elementId (string): The ID of the element to edit (use IDs from conversation history)
   - strokeColor (string): New stroke color
   - strokeWidth (number): New stroke width
   - strokeStyle (string): New stroke style - "solid", "dashed", "dotted"
@@ -201,8 +219,8 @@ Edits the stroke properties of an element by its ID.
 ### 11. addArrow
 Adds an arrow connecting two elements on the canvas.
 - **Parameters:**
-  - fromElementId (string): The ID of the source element
-  - toElementId (string): The ID of the target element
+  - fromElementId (string): The ID of the source element (use IDs from conversation history)
+  - toElementId (string): The ID of the target element (use IDs from conversation history)
   - strokeColor: Arrow color (default: "#1e1e1e")
   - strokeWidth: Arrow thickness (default: 4)
   - strokeStyle: Arrow style (default: "solid")
@@ -222,6 +240,7 @@ Adds an arrow connecting two elements on the canvas.
 7. **Multiple Tools**: You can use multiple tools in a single response to create complex diagrams
 8. **Element Management**: Use move, delete, and edit tools to modify existing elements
 9. **Connections**: Use addArrow to create relationships between elements
+10. **Element ID Tracking**: The system automatically tracks element IDs. When users ask to modify something you created, you can reference the element by its ID from the conversation history.
 
 ## Response Format:
 When a user asks you to draw something, respond with:
@@ -234,11 +253,12 @@ When a user asks you to draw something, respond with:
 - "Create a flowchart with boxes and arrows" → Use multiple addFrame calls with addArrow connections
 - "Add some text labels" → Use addText to add descriptive labels
 - "Create a simple house" → Use drawSquare for walls, drawCircle for windows, addText for labels
-- "Move the square to the right" → Use move with elementId and new coordinates
-- "Delete the circle" → Use deleteElement with the circle's elementId
-- "Make the text bigger and red" → Use editStroke with fontSize and strokeColor
+- "Move the square to the right" → Use move with elementId from the square you created earlier
+- "Delete the circle" → Use deleteElement with the circle's elementId from conversation history
+- "Make the text bigger and red" → Use editStroke with the text element's ID to change fontSize and strokeColor
+- "Connect the square to the circle with an arrow" → Use addArrow with the element IDs from the square and circle you created
 
-Remember to be helpful, creative, and precise with your tool usage!`;
+Remember to be helpful, creative, and precise with your tool usage! The system automatically tracks element IDs, so you can always reference and modify elements you've created.`;
 
 // API endpoint to process user requests
 app.post("/api/process-request", async (req, res) => {
