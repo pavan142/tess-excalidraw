@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Conversation history array to store past interactions
 let conversationHistory: Array<{
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
   toolUsed?:
@@ -11,126 +11,26 @@ let conversationHistory: Array<{
         payload: any;
       }
     | undefined;
+  elementId?: string; // Track the ID of created elements
 }> = [];
-
-// Updated tool schema to support multiple tools
-const toolSchema = z.object({
-  tools: z.array(
-    z.object({
-      tool: z.enum([
-        "drawSquare",
-        "drawCircle",
-        "editSquare",
-        "drawRectangle",
-        "drawText",
-      ]),
-      payload: z.object({
-        x: z.number().optional(),
-        y: z.number().optional(),
-        size: z.number().optional(),
-        width: z.number().optional(),
-        height: z.number().optional(),
-        text: z.string().optional(),
-        strokeColor: z.string().optional(),
-        backgroundColor: z.string().optional(),
-        fillStyle: z
-          .enum(["hachure", "solid", "cross-hatch", "zigzag"])
-          .optional(),
-        strokeWidth: z.number().optional(),
-        strokeStyle: z.enum(["solid", "dashed", "dotted"]).optional(),
-        roughness: z.number().optional(),
-        opacity: z.number().optional().nullable(),
-        roundness: z.number().optional().nullable(),
-      }),
-    }),
-  ),
-  message: z.string(),
-});
-
-// Updated instruction prompt
-const instructionPrompt = `You are an AI assistant that can directly interact with an Excalidraw whiteboard application. You have access to drawing tools that allow you to create and modify elements on the canvas.
-
-## Available Tools:
-
-### 1. drawSquare
-Creates a square on the canvas.
-- **Parameters:**
-  - x (number): X coordinate for top-left corner (default: 100)
-  - y (number): Y coordinate for top-left corner (default: 100)
-  - size (number): Width and height of the square (default: 100)
-  - strokeColor (string): Border color (default: "#1e1e1e")
-  - backgroundColor (string): Fill color (default: "skyblue")
-  - fillStyle (string): Fill pattern - "hachure", "solid", "cross-hatch", "zigzag" (default: "hachure")
-  - strokeWidth (number): Border thickness (default: 4)
-  - strokeStyle (string): Border style - "solid", "dashed", "dotted" (default: "solid")
-  - roughness (number): Hand-drawn effect (default: 1)
-  - opacity (number): Transparency 0-100 (default: 90)
-  - roundness (number): Corner radius (default: null)
-
-### 2. drawCircle
-Creates a circle on the canvas.
-- **Parameters:** Same as drawSquare, but creates a circular shape
-
-### 3. drawRectangle
-Creates a rectangle on the canvas.
-- **Parameters:**
-  - x, y: Position coordinates
-  - width, height: Dimensions (can be different for rectangles)
-  - All styling parameters same as drawSquare
-
-### 4. drawText
-Adds text to the canvas.
-- **Parameters:**
-  - x, y: Position coordinates
-  - text (string): The text content to display
-  - fontSize (number): Text size (default: 20)
-  - fontFamily (string): Font type (default: "Virgil")
-  - textAlign (string): "left", "center", "right" (default: "left")
-  - strokeColor: Text color
-
-### 5. editSquare
-Modifies an existing square element.
-- **Parameters:** Same as drawSquare, plus elementId to identify which element to edit
-
-## Usage Guidelines:
-
-1. **Be Creative**: Use the tools to create interesting diagrams, flowcharts, or visual representations
-2. **Coordinate System**: The canvas uses a coordinate system where (0,0) is at the top-left
-3. **Color Options**: Use descriptive colors like "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown", "gray", "black", "white"
-4. **Positioning**: Think about where elements should be placed relative to each other
-5. **Sizing**: Consider appropriate sizes for different elements (small for details, large for main elements)
-6. **Styling**: Use different stroke widths, colors, and fill styles to create visual hierarchy
-7. **Multiple Tools**: You can use multiple tools in a single response to create complex diagrams
-
-## Response Format:
-When a user asks you to draw something, respond with:
-1. A brief description of what you're going to create
-2. Use the appropriate tool(s) with specific parameters (you can use multiple tools)
-3. Provide a friendly message explaining what was created
-
-## Examples:
-- "Draw a red square in the center" → Use drawSquare with x: 200, y: 200, size: 100, strokeColor: "red"
-- "Create a flowchart with boxes and arrows" → Use multiple drawRectangle calls with connecting lines
-- "Add some text labels" → Use drawText to add descriptive labels
-- "Create a simple house" → Use drawRectangle for walls, drawSquare for windows, drawText for labels
-
-Remember to be helpful, creative, and precise with your tool usage!`;
 
 // Function to add message to conversation history
 function addToHistory(
-  role: "user" | "assistant",
+  role: "user" | "assistant" | "system",
   content: string,
   toolUsed?: { name: string; payload: any },
+  elementId?: string,
 ) {
   conversationHistory.push({
     role,
     content,
     timestamp: new Date(),
     toolUsed,
+    elementId,
   });
 }
 
-// Function to get conversation context
+// Function to get conversation context (excluding system messages for Claude)
 function getConversationContext(): string {
   if (conversationHistory.length === 0) {
     return "";
@@ -160,7 +60,7 @@ export async function processUserRequest(userMessage: string) {
       },
       body: JSON.stringify({
         userMessage,
-        conversationHistory,
+        conversationHistory: conversationHistory, // Only send non-system messages to Claude
       }),
     });
 
@@ -171,26 +71,44 @@ export async function processUserRequest(userMessage: string) {
     const result = await response.json();
 
     if (result.success) {
-      // Add assistant response to history
-      addToHistory("assistant", result.message, {
-        name:
-          result.tools?.length > 0
-            ? result.tools.map((t: any) => t.tool).join(", ")
-            : "",
-        payload: result.tools || [],
-      });
-
-      // Execute all tools
+      // Execute all tools and track their element IDs
+      const executedTools = [];
       if (result.tools && Array.isArray(result.tools)) {
         for (const tool of result.tools) {
-          await executeTool(tool.tool, tool.payload);
+          const elementId = await executeTool(tool.tool, tool.payload);
+
+          // Add the element ID to the tool data
+          const executedTool = {
+            ...tool,
+            elementId: elementId,
+          };
+          executedTools.push(executedTool);
+
+          // Add system message to track successful tool execution
+          if (elementId) {
+            addToHistory(
+              "system",
+              `Successfully executed ${tool.tool} with element ID: ${elementId}`,
+              { name: tool.tool, payload: tool.payload, elementId: elementId },
+              elementId,
+            );
+          }
         }
       }
+
+      // Add assistant response to history with updated tool data including element IDs
+      addToHistory("assistant", result.message, {
+        name:
+          executedTools.length > 0
+            ? executedTools.map((t: any) => t.tool).join(", ")
+            : "",
+        payload: executedTools,
+      });
 
       return {
         success: true,
         message: result.message,
-        tools: result.tools,
+        tools: executedTools,
       };
     } else {
       return {
@@ -209,52 +127,23 @@ export async function processUserRequest(userMessage: string) {
   }
 }
 
-// Function to execute tools
-async function executeTool(toolName: string, payload: any) {
+// Function to execute tools and return element ID
+async function executeTool(
+  toolName: string,
+  payload: any,
+): Promise<string | null> {
   try {
+    let elementId: string | null = null;
+
     switch (toolName) {
       case "drawSquare":
         // @ts-ignore
         if (window["drawSquare"]) {
           // @ts-ignore
-          window["drawSquare"](payload.x, payload.y, payload.size, {
-            strokeColor: payload.strokeColor,
-            backgroundColor: payload.backgroundColor,
-            fillStyle: payload.fillStyle,
-            strokeWidth: payload.strokeWidth,
-            strokeStyle: payload.strokeStyle,
-            roughness: payload.roughness,
-            opacity: payload.opacity,
-            roundness: payload.roundness,
-          });
-        }
-        break;
-
-      case "drawCircle":
-        // @ts-ignore
-        if (window["drawCircle"]) {
-          // @ts-ignore
-          window["drawCircle"](payload.x, payload.y, payload.size, {
-            strokeColor: payload.strokeColor,
-            backgroundColor: payload.backgroundColor,
-            fillStyle: payload.fillStyle,
-            strokeWidth: payload.strokeWidth,
-            strokeStyle: payload.strokeStyle,
-            roughness: payload.roughness,
-            opacity: payload.opacity,
-          });
-        }
-        break;
-
-      case "drawRectangle":
-        // @ts-ignore
-        if (window["drawRectangle"]) {
-          // @ts-ignore
-          window["drawRectangle"](
+          const element = window["drawSquare"](
             payload.x,
             payload.y,
-            payload.width,
-            payload.height,
+            payload.size,
             {
               strokeColor: payload.strokeColor,
               backgroundColor: payload.backgroundColor,
@@ -266,24 +155,202 @@ async function executeTool(toolName: string, payload: any) {
               roundness: payload.roundness,
             },
           );
+          elementId = element?.id || null;
         }
         break;
 
-      case "drawText":
-        // TODO: Implement drawText function
-        console.log("drawText not yet implemented");
+      case "drawCircle":
+        // @ts-ignore
+        if (window["drawCircle"]) {
+          // @ts-ignore
+          const element = window["drawCircle"](
+            payload.x,
+            payload.y,
+            payload.size,
+            {
+              strokeColor: payload.strokeColor,
+              backgroundColor: payload.backgroundColor,
+              fillStyle: payload.fillStyle,
+              strokeWidth: payload.strokeWidth,
+              strokeStyle: payload.strokeStyle,
+              roughness: payload.roughness,
+              opacity: payload.opacity,
+            },
+          );
+          elementId = element?.id || null;
+        }
         break;
 
-      case "editSquare":
-        // TODO: Implement editSquare function
-        console.log("editSquare not yet implemented");
+      case "drawLine":
+        // @ts-ignore
+        if (window["drawLine"]) {
+          // @ts-ignore
+          const element = window["drawLine"](
+            payload.x,
+            payload.y,
+            payload.width,
+            payload.height,
+            {
+              strokeColor: payload.strokeColor,
+              strokeWidth: payload.strokeWidth,
+              strokeStyle: payload.strokeStyle,
+              roughness: payload.roughness,
+              opacity: payload.opacity,
+            },
+          );
+          elementId = element?.id || null;
+        }
+        break;
+
+      case "addText":
+        // @ts-ignore
+        if (window["addText"]) {
+          // @ts-ignore
+          const element = window["addText"](
+            payload.x,
+            payload.y,
+            payload.text,
+            {
+              fontSize: payload.fontSize,
+              fontFamily: payload.fontFamily,
+              textAlign: payload.textAlign,
+              verticalAlign: payload.verticalAlign,
+              strokeColor: payload.strokeColor,
+              backgroundColor: payload.backgroundColor,
+              fillStyle: payload.fillStyle,
+              strokeWidth: payload.strokeWidth,
+              strokeStyle: payload.strokeStyle,
+              roughness: payload.roughness,
+              opacity: payload.opacity,
+              angle: payload.angle,
+            },
+          );
+          elementId = element?.id || null;
+        }
+        break;
+
+      case "addImage":
+        // @ts-ignore
+        if (window["addImage"]) {
+          // @ts-ignore
+          const element = window["addImage"](
+            payload.x,
+            payload.y,
+            payload.imageUrl,
+            {
+              width: payload.width,
+              height: payload.height,
+              scale: payload.scale,
+              opacity: payload.opacity,
+              angle: payload.angle,
+            },
+          );
+          elementId = element?.id || null;
+        }
+        break;
+
+      case "addFrame":
+        // @ts-ignore
+        if (window["addFrame"]) {
+          // @ts-ignore
+          const element = window["addFrame"](
+            payload.x,
+            payload.y,
+            payload.width,
+            payload.height,
+            payload.name,
+            {
+              strokeColor: payload.strokeColor,
+              backgroundColor: payload.backgroundColor,
+              fillStyle: payload.fillStyle,
+              strokeWidth: payload.strokeWidth,
+              strokeStyle: payload.strokeStyle,
+              roughness: payload.roughness,
+              opacity: payload.opacity,
+              angle: payload.angle,
+            },
+          );
+          elementId = element?.id || null;
+        }
+        break;
+
+      case "move":
+        // @ts-ignore
+        if (window["move"]) {
+          // @ts-ignore
+          const element = window["move"](
+            payload.elementId,
+            payload.x,
+            payload.y,
+          );
+          elementId = element?.id || payload.elementId; // Return the moved element's ID
+        }
+        break;
+
+      case "moveTo":
+        // @ts-ignore
+        if (window["moveTo"]) {
+          // @ts-ignore
+          const element = window["moveTo"](
+            payload.elementId,
+            (payload.x, payload.y),
+          );
+          elementId = element?.id || payload.elementId; // Return the moved element's ID
+        }
+        break;
+
+      case "deleteElement":
+        // @ts-ignore
+        if (window["deleteElement"]) {
+          // @ts-ignore
+          const element = window["deleteElement"](payload.elementId);
+          elementId = payload.elementId; // Return the deleted element's ID
+        }
+        break;
+
+      case "editStroke":
+        // @ts-ignore
+        if (window["editStroke"]) {
+          // @ts-ignore
+          const element = window["editStroke"](
+            payload.elementId,
+            payload.strokeColor,
+            payload.strokeWidth,
+            payload.strokeStyle,
+          );
+          elementId = element?.id || payload.elementId; // Return the edited element's ID
+        }
+        break;
+
+      case "addArrow":
+        // @ts-ignore
+        if (window["addArrow"]) {
+          // @ts-ignore
+          const element = window["addArrow"](
+            payload.fromElementId,
+            payload.toElementId,
+            {
+              strokeColor: payload.strokeColor,
+              strokeWidth: payload.strokeWidth,
+              strokeStyle: payload.strokeStyle,
+              startArrowhead: payload.startArrowhead,
+              endArrowhead: payload.endArrowhead,
+              roughness: payload.roughness,
+              opacity: payload.opacity,
+            },
+          );
+          elementId = element?.id || null;
+        }
         break;
 
       default:
         console.warn(`Unknown tool: ${toolName}`);
     }
+
+    return elementId;
   } catch (error) {
     console.error(`Error executing tool ${toolName}:`, error);
+    return null;
   }
 }
 
@@ -295,4 +362,12 @@ export function getConversationHistory() {
 // Export function to clear conversation history
 export function clearConversationHistory() {
   conversationHistory = [];
+}
+
+// Export function to get element IDs from history
+export function getElementIdsFromHistory(): string[] {
+  return conversationHistory
+    .filter((msg) => msg.elementId)
+    .map((msg) => msg.elementId!)
+    .filter((id, index, arr) => arr.indexOf(id) === index); // Remove duplicates
 }
