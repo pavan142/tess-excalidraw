@@ -293,7 +293,8 @@ async function executeTool(
           // @ts-ignore
           const element = window["moveTo"](
             payload.elementId,
-            (payload.x, payload.y),
+            payload.x,
+            payload.y,
           );
           elementId = element?.id || payload.elementId; // Return the moved element's ID
         }
@@ -322,26 +323,50 @@ async function executeTool(
         }
         break;
 
-      case "addArrow":
-        // @ts-ignore
-        if (window["addArrow"]) {
+              case "addArrow":
           // @ts-ignore
-          const element = window["addArrow"](
-            payload.fromElementId,
-            payload.toElementId,
-            {
-              strokeColor: payload.strokeColor,
-              strokeWidth: payload.strokeWidth,
-              strokeStyle: payload.strokeStyle,
-              startArrowhead: payload.startArrowhead,
-              endArrowhead: payload.endArrowhead,
-              roughness: payload.roughness,
-              opacity: payload.opacity,
-            },
-          );
-          elementId = element?.id || null;
-        }
-        break;
+          if (window["addArrow"]) {
+            // @ts-ignore
+            const element = window["addArrow"](
+              payload.fromElementId,
+              payload.toElementId,
+              {
+                strokeColor: payload.strokeColor,
+                strokeWidth: payload.strokeWidth,
+                strokeStyle: payload.strokeStyle,
+                startArrowhead: payload.startArrowhead,
+                endArrowhead: payload.endArrowhead,
+                roughness: payload.roughness,
+                opacity: payload.opacity,
+              },
+            );
+            elementId = element?.id || null;
+          }
+          break;
+
+        case "executeFlow":
+          // Import flowManager dynamically to avoid circular dependencies
+          const { flowManager } = await import('./FlowManager');
+          const flow = flowManager.findFlowByName(payload.flowName);
+          
+          if (flow) {
+            const parameters = {
+              xOffset: payload.xOffset,
+              yOffset: payload.yOffset,
+              rotation: payload.rotation,
+              scale: payload.scale,
+              color: payload.color,
+              count: payload.count,
+              direction: payload.direction,
+              spacing: payload.spacing,
+            };
+            
+            await flowManager.executeFlow(flow, parameters);
+            console.log(`Executed flow: ${flow.name} with parameters:`, parameters);
+          } else {
+            console.error(`Flow not found: ${payload.flowName}`);
+          }
+          break;
 
       default:
         console.warn(`Unknown tool: ${toolName}`);
