@@ -43,6 +43,7 @@ const toolSchema = z.object({
         "deleteElement",
         "editStroke",
         "addArrow",
+        "executeFlow",
       ]),
       payload: z.object({
         x: z.number().optional(),
@@ -80,6 +81,17 @@ const toolSchema = z.object({
           .enum(["arrow", "bar", "dot", "triangle"])
           .optional()
           .nullable(),
+        // Flow execution parameters
+        flowName: z.string().optional(),
+        count: z.number().optional(),
+        spacing: z.number().optional(),
+        delay: z.number().optional(),
+        condition: z.string().optional(),
+        priority: z.enum(["high", "medium", "low"]).optional(),
+        // Dynamic parameters (will be validated at runtime)
+        ...Object.fromEntries(
+          Array.from({ length: 10 }, (_, i) => [`param${i}`, z.any().optional()])
+        ),
       }),
     }),
   ),
@@ -229,18 +241,38 @@ Adds an arrow connecting two elements on the canvas.
   - roughness: Hand-drawn effect (default: 1)
   - opacity: Transparency 0-100 (default: 90)
 
+### 12. executeFlow
+Executes a saved flow with smart parameterization that adapts to the flow's content.
+- **Generic Parameters (work for all flows):**
+  - flowName (string): Name of the saved flow to execute
+  - count (number): Number of times to execute the flow (default: 1)
+  - spacing (number): Spacing between multiple instances (default: 200)
+  - delay (number): Delay between executions in seconds
+  - condition (string): Condition to check before execution
+  - priority (string): Execution priority - "high", "medium", "low"
+
+- **Dynamic Parameters (discovered from flow content):**
+  - The system automatically discovers what parameters each flow can accept
+  - For visual flows: position, color, scale, rotation parameters
+  - For business flows: text, values, enums, conditions
+  - Parameters are validated against the flow's actual capabilities
+
 ## Usage Guidelines:
 
-1. **Be Creative**: Use the tools to create interesting diagrams, flowcharts, or visual representations
-2. **Coordinate System**: The canvas uses a coordinate system where (0,0) is at the top-left
-3. **Color Options**: Use descriptive colors like "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown", "gray", "black", "white"
-4. **Positioning**: Think about where elements should be placed relative to each other
-5. **Sizing**: Consider appropriate sizes for different elements (small for details, large for main elements)
-6. **Styling**: Use different stroke widths, colors, and fill styles to create visual hierarchy
-7. **Multiple Tools**: You can use multiple tools in a single response to create complex diagrams
-8. **Element Management**: Use move, delete, and edit tools to modify existing elements
-9. **Connections**: Use addArrow to create relationships between elements
-10. **Element ID Tracking**: The system automatically tracks element IDs. When users ask to modify something you created, you can reference the element by its ID from the conversation history.
+1. **Flow Execution Priority**: When a user mentions a flow name (especially with @ symbol), ALWAYS use executeFlow instead of creating new drawings
+2. **@ Symbol Detection**: If the user message contains "@" followed by a flow name, use executeFlow with that flowName
+3. **Flow Name Matching**: Match the flow name exactly as it appears in the user's message
+4. **Parameter Extraction**: Extract any parameters mentioned (count, color, position, etc.) and pass them to executeFlow
+5. **Be Creative**: Use the tools to create interesting diagrams, flowcharts, or visual representations
+6. **Coordinate System**: The canvas uses a coordinate system where (0,0) is at the top-left
+7. **Color Options**: Use descriptive colors like "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown", "gray", "black", "white"
+8. **Positioning**: Think about where elements should be placed relative to each other
+9. **Sizing**: Consider appropriate sizes for different elements (small for details, large for main elements)
+10. **Styling**: Use different stroke widths, colors, and fill styles to create visual hierarchy
+11. **Multiple Tools**: You can use multiple tools in a single response to create complex diagrams
+12. **Element Management**: Use move, delete, and edit tools to modify existing elements
+13. **Connections**: Use addArrow to create relationships between elements
+14. **Element ID Tracking**: The system automatically tracks element IDs. When users ask to modify something you created, you can reference the element by its ID from the conversation history.
 
 ## Response Format:
 When a user asks you to draw something, respond with:
@@ -248,7 +280,25 @@ When a user asks you to draw something, respond with:
 2. Use the appropriate tool(s) with specific parameters (you can use multiple tools)
 3. Provide a friendly message explaining what was created
 
+## Flow Execution Rules:
+1. **ALWAYS check for @ symbol first** - if present, extract the flow name and use executeFlow
+2. **Flow name extraction**: Take the text after @ symbol as the flowName (e.g., "@star" → flowName: "star")
+3. **Parameter parsing**: Look for numbers (count), colors, directions, etc. in the user message
+4. **Exact matching**: Use the flow name exactly as provided by the user
+5. **Fallback**: Only use regular drawing tools if no @ symbol is present
+
 ## Examples:
+
+### Flow Execution (PRIORITY - Use these when @ symbol is present):
+- "@star" → Use executeFlow with flowName: "star"
+- "@draw a duck" → Use executeFlow with flowName: "draw a duck"
+- "@star 5 times" → Use executeFlow with flowName: "star", count: 5
+- "@star in blue" → Use executeFlow with flowName: "star", color: "blue"
+- "@star 3 times facing left" → Use executeFlow with flowName: "star", count: 3, rotation: -90
+- "draw a @star" → Use executeFlow with flowName: "star"
+- "create @star" → Use executeFlow with flowName: "star"
+
+### Regular Drawing Commands:
 - "Draw a red square in the center" → Use drawSquare with x: 200, y: 200, size: 100, strokeColor: "red"
 - "Create a flowchart with boxes and arrows" → Use multiple addFrame calls with addArrow connections
 - "Add some text labels" → Use addText to add descriptive labels
